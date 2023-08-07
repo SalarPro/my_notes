@@ -99,15 +99,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       "title": title,
       "body": body,
     };
+    // '{"id":2,"title":"my database Title","body":"Hello from DB"}'
 
     var jsonString = jsonEncode(noteMap);
-
     SharedPreferences sharedPref = await SharedPreferences.getInstance();
 
-    sharedPref.setString("json_string", jsonString);
+    var notes = sharedPref.getStringList('noteListJson') ?? [];
 
-    databaseJsonString = jsonString;
+    notes.add(jsonString);
 
+    sharedPref.setStringList("noteListJson", notes);
+
+    print(notes);
     Navigator.pop(context);
   }
 

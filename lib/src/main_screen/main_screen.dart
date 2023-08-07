@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:my_notes/src/note_editor_screen/note_editor_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-String? databaseJsonString;
+List<String>? databaseJsonString;
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -20,8 +20,7 @@ class _MainScreenState extends State<MainScreen> {
   TextStyle get bodyTextStyle =>
       TextStyle(fontSize: 14, color: Colors.grey.shade700);
 
-  String titleText = "Title";
-  String bodyText = "Body";
+  List<Map<String, dynamic>> myNotes = [];
 
   @override
   void initState() {
@@ -57,21 +56,25 @@ class _MainScreenState extends State<MainScreen> {
     return Center(
       child: ListView(
         children: [
-          cellView(),
+          for (var note in myNotes)
+            cellView(
+              titleText: note['title'],
+              bodyText: note['body'],
+            )
         ],
       ),
     );
   }
 
-  Widget cellView() {
+  Widget cellView({String? titleText, String? bodyText}) {
     return GestureDetector(
       onTap: () async {
         await Navigator.push(
             context,
             MaterialPageRoute(
                 builder: (context) => NoteEditorScreen(
-                      body: bodyText,
                       title: titleText,
+                      body: bodyText,
                     )));
         loadData();
       },
@@ -87,7 +90,7 @@ class _MainScreenState extends State<MainScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                titleText,
+                titleText ?? "",
                 textAlign: TextAlign.start,
                 style: titleTextStyle,
                 maxLines: 1,
@@ -95,7 +98,7 @@ class _MainScreenState extends State<MainScreen> {
               ),
               SizedBox(height: 15),
               Text(
-                bodyText,
+                bodyText ?? "",
                 style: bodyTextStyle,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
@@ -109,22 +112,17 @@ class _MainScreenState extends State<MainScreen> {
 
   void loadData() async {
     var sharedPref = await SharedPreferences.getInstance();
-    var dbDataString = sharedPref.getString("json_string");
 
-    if (dbDataString != null) {
-      //Convert jsonString to JSON then cast to it's variable type
-      var json = jsonDecode(dbDataString) as Map<String, dynamic>;
+    var noetList = sharedPref.getStringList("noteListJson") ?? [];
+    print("noetList: ${noetList.length}");
 
-      // you can use the data
-      var id = json["id"]; //1
-      var title = json["title"]; // title1
-      var body = json["body"];
-
-      print("ID: $id");
-
-      titleText = title;
-      bodyText = body;
-      setState(() {});
+    myNotes.clear();
+    // myNotes = [];
+    for (var jsonString in noetList) {
+      jsonString; //  '{"id": 123, "title": "alksdlaksd", "body": "asdasd"}'
+      var json = jsonDecode(jsonString) as Map<String, dynamic>;
+      myNotes.add(json);
     }
+    setState(() {});
   }
 }
