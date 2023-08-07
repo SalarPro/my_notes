@@ -1,10 +1,16 @@
 // ignore_for_file: prefer_const_constructors
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:my_notes/src/main_screen/main_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NoteEditorScreen extends StatefulWidget {
-  const NoteEditorScreen({super.key});
+  const NoteEditorScreen({super.key, this.title, this.body});
+
+  final String? title;
+  final String? body;
 
   @override
   State<NoteEditorScreen> createState() => _NoteEditorScreenState();
@@ -13,6 +19,15 @@ class NoteEditorScreen extends StatefulWidget {
 class _NoteEditorScreenState extends State<NoteEditorScreen> {
   var titleTEC = TextEditingController();
   var bodyTEC = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.title != null) {
+      titleTEC.text = widget.title ?? "";
+      bodyTEC.text = widget.body ?? "";
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,10 +94,58 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     var title = titleTEC.text;
     var body = bodyTEC.text;
 
-    print("title: $title");
-    SharedPreferences pref = await SharedPreferences.getInstance();
-    pref.setString("title", title);
-    pref.setString("body", body);
+    Map<String, dynamic> noteMap = {
+      "id": DateTime.now().millisecondsSinceEpoch, // 45465456465
+      "title": title,
+      "body": body,
+    };
+
+    var jsonString = jsonEncode(noteMap);
+
+    SharedPreferences sharedPref = await SharedPreferences.getInstance();
+
+    sharedPref.setString("json_string", jsonString);
+
+    databaseJsonString = jsonString;
+
     Navigator.pop(context);
+  }
+
+  tests() async {
+    // First step: make model
+    Map<String, dynamic> map = {
+      "id": 2,
+      "title": "my database Title",
+      "body": "Hello from DB",
+    };
+
+    // convert model to String json
+    String jsonString = jsonEncode(map);
+
+    SharedPreferences sharedPref = await SharedPreferences.getInstance();
+
+    sharedPref.setString("json_string", jsonString);
+
+    /////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////
+
+    var dbDataString = sharedPref.getString("json_string");
+
+    if (dbDataString != null) {
+      //Convert jsonString to JSON then cast to it's variable type
+      var json = jsonDecode(dbDataString) as Map<String, dynamic>;
+
+      // you can use the data
+      var id = json["id"]; //1
+      var title = json["title"]; // title1
+      var body = json["body"];
+
+      print("ID: $id");
+      print("title: $title");
+      print("body: $body");
+    }
   }
 }
