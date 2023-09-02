@@ -3,23 +3,25 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:my_notes/src/models/note_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NoteEditorScreen extends StatefulWidget {
   const NoteEditorScreen({super.key, this.note});
 
-  final Map<String, dynamic>? note;
+  final NoteModel? note;
   @override
   State<NoteEditorScreen> createState() => _NoteEditorScreenState();
 }
 
 class _NoteEditorScreenState extends State<NoteEditorScreen> {
-  Map<String, dynamic>? note;
+  NoteModel? note;
 
   var titleTEC = TextEditingController();
   var bodyTEC = TextEditingController();
 
   bool isUpdate = false;
+  bool isLoading = false;
 
   @override
   void initState() {
@@ -27,36 +29,41 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     note = widget.note;
     if (note != null) {
       isUpdate = true;
-      titleTEC.text = note!["title"];
-      bodyTEC.text = note!["body"];
+      titleTEC.text = note?.title ?? "";
+      bodyTEC.text = note?.body ?? "";
     }
-
-    titleTEC.addListener(() {
-      save();
-    });
-    bodyTEC.addListener(() {
-      save();
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _appBar,
-      body: _body,
+      body: Stack(
+        children: [
+          _body,
+          if (isLoading)
+            Positioned.fill(
+                child: Container(
+              color: Colors.black26,
+              child: Center(
+                child: CircularProgressIndicator(),
+              ),
+            ))
+        ],
+      ),
     );
   }
 
   AppBar get _appBar => AppBar(
         title: const Text('New Note'),
-        /*  actions: [
+        actions: [
           IconButton(
             onPressed: () {
               save();
             },
             icon: Icon(Icons.save),
           ),
-        ], */
+        ],
       );
 
   Widget get _body {
@@ -102,88 +109,29 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   save() async {
+    setState(() {
+      isLoading = true;
+    });
+
     var title = titleTEC.text;
     var body = bodyTEC.text;
 
     if (isUpdate) {
-      //Update
-      var noteTotUpdate = note!;
-
-      var id = noteTotUpdate["id"] as int;
-
-      SharedPreferences sharedPref = await SharedPreferences.getInstance();
-      List<String> notes = sharedPref.getStringList('noteListJson') ?? [];
-
-      List<Map<String, dynamic>> savedNotesList = [];
-
-      for (var stringJson in notes) {
-        var obj = jsonDecode(stringJson) as Map<String, dynamic>;
-        savedNotesList.add(obj);
-      }
-
-      /* savedNotesList = [
-        {"id": 12, "title": "Hello", "body": "TEXT TEST"}, //index 0
-        {"id": 23, "title": "Hello", "body": "TEXT TEST"}, //index 1
-        {"id": 34, "title": "Hello", "body": "TEXT TEST"}, //index 2
-        {"id": 45, "title": "Hello", "body": "TEXT TEST"}, //index 3
-        {"id": 56, "title": "Hello", "body": "TEXT TEST"}, //index 4
-      ]; */
-
-      int index = 0;
-
-      // to Get the index of the Note
-      for (var i = 0; i < savedNotesList.length; i++) {
-        var listId = (savedNotesList[i]['id'] as int);
-        if (listId == id) {
-          index = i;
-          break; //this is to exit the for loop
-        }
-      }
-
-      savedNotesList[index]["title"] = title;
-      savedNotesList[index]["body"] = body;
-
-      /*  savedNotesList = [
-        {"id": 12, "title": "Hello", "body": "TEXT TEST"},
-        {"id": 23, "title": "Hello", "body": "TEXT TEST"},
-        {"id": 34, "title": "new title", "body": "new new body"},
-        {"id": 45, "title": "Hello", "body": "TEXT TEST"},
-        {"id": 56, "title": "Hello", "body": "TEXT TEST"},
-      ]; */
-
-      List<String> stringList = [];
-
-      for (var obj in savedNotesList) {
-        var stringObg = jsonEncode(obj);
-        stringList.add(stringObg);
-      }
-
-      sharedPref.setStringList("noteListJson", stringList);
-
-      // Navigator.pop(context);
+      note?.title = title;
+      note?.body = body;
+      await note?.update();
     } else {
-      // Create
-      Map<String, dynamic> noteMap = {
-        "id": DateTime.now().millisecondsSinceEpoch, // 45465456465
-        "title": title,
-        "body": body,
-      };
-      // '{"id":2,"title":"my database Title","body":"Hello from DB"}'
-
-      var jsonString = jsonEncode(noteMap);
-      SharedPreferences sharedPref = await SharedPreferences.getInstance();
-
-      var notes = sharedPref.getStringList('noteListJson') ?? [];
-
-      notes.add(jsonString);
-
-      sharedPref.setStringList("noteListJson", notes);
-
-      print(notes);
-      isUpdate = true;
-      note = noteMap;
-      // Navigator.pop(context);
+      note = NoteModel(
+        title: title,
+        body: body,
+      );
+      await note!.create();
     }
+    setState(() {
+      isLoading = false;
+    });
+
+    Navigator.pop(context);
   }
 
   tests() async {

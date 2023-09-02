@@ -1,10 +1,8 @@
 // ignore_for_file: curly_braces_in_flow_control_structures, prefer_const_constructors, prefer_const_literals_to_create_immutables
 
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
+import 'package:my_notes/src/models/note_model.dart';
 import 'package:my_notes/src/note_editor_screen/note_editor_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 List<String>? databaseJsonString;
 
@@ -24,12 +22,9 @@ class _MainScreenState extends State<MainScreen> {
   TextStyle get bodyTextStyle =>
       TextStyle(fontSize: 14, color: Colors.grey.shade700);
 
-  List<Map<String, dynamic>> myNotes = [];
-
   @override
   void initState() {
     super.initState();
-    loadData();
   }
 
   @override
@@ -37,7 +32,7 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       appBar: _appBar,
       body: _body,
-      floatingActionButton: myNotes.isEmpty ? null : _floatingActionButton,
+      floatingActionButton: _floatingActionButton,
     );
   }
 
@@ -54,8 +49,27 @@ class _MainScreenState extends State<MainScreen> {
       );
 
   Widget get _body {
-    if (myNotes.isEmpty)
-      return GestureDetector(
+    return StreamBuilder<List<NoteModel>>(
+        stream: NoteModel.steamAll(),
+        builder: (context, snapshot) {
+          if (snapshot.data == null || (snapshot.data?.isEmpty ?? false)) {
+            return emptyView;
+          }
+
+          var myNotes = snapshot.data!;
+
+          return ListView(
+            children: [
+              for (var note in myNotes)
+                cellView(
+                  note: note,
+                ),
+            ],
+          );
+        });
+  }
+
+  get emptyView => GestureDetector(
         onTap: () {
           createNewNote();
         },
@@ -97,28 +111,15 @@ class _MainScreenState extends State<MainScreen> {
         ),
       );
 
-    return Center(
-      child: ListView(
-        children: [
-          for (var note in myNotes)
-            cellView(
-              note: note,
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget cellView({required Map<String, dynamic> note}) {
+  Widget cellView({required NoteModel note}) {
     return GestureDetector(
-      onTap: () async {
-        await Navigator.push(
+      onTap: () {
+        Navigator.push(
             context,
             MaterialPageRoute(
                 builder: (context) => NoteEditorScreen(
                       note: note,
                     )));
-        loadData();
       },
       child: Padding(
         padding: const EdgeInsets.all(10),
@@ -132,7 +133,7 @@ class _MainScreenState extends State<MainScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                note['title'] ?? "",
+                note.title ?? "",
                 textAlign: TextAlign.start,
                 style: titleTextStyle,
                 maxLines: 1,
@@ -140,7 +141,7 @@ class _MainScreenState extends State<MainScreen> {
               ),
               SizedBox(height: 15),
               Text(
-                note["body"] ?? "",
+                note.body ?? "",
                 style: bodyTextStyle,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
@@ -148,7 +149,7 @@ class _MainScreenState extends State<MainScreen> {
               SizedBox(
                 width: double.infinity,
                 child: Text(
-                  "ID: ${note['id']}",
+                  "ID: ${note.uid}",
                   style: idTextStyle,
                   textAlign: TextAlign.end,
                   maxLines: 1,
@@ -171,25 +172,7 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void loadData() async {
-    var sharedPref = await SharedPreferences.getInstance();
-
-    var noetList = sharedPref.getStringList("noteListJson") ?? [];
-    print("noetList: ${noetList.length}");
-
-    //To remove old data from list variable
-    myNotes.clear(); // -> []
-    // myNotes = [1,2,3,1,2,3,4];
-
-    for (var jsonString in noetList) {
-      // jsonString;   '{"id": 123, "title": "alksdlaksd", "body": "asdasd"}'
-      var json = jsonDecode(jsonString) as Map<String, dynamic>;
-      myNotes.add(json);
-    }
-    setState(() {});
-  }
-
-  void showDialogToDeleteNote(Map<String, dynamic> note) {
+  void showDialogToDeleteNote(NoteModel note) {
     showDialog(
         context: context,
         builder: (context) {
@@ -199,7 +182,7 @@ class _MainScreenState extends State<MainScreen> {
             actions: [
               TextButton(
                 onPressed: () {
-                  deleteNote(note);
+                  note.delete();
                   Navigator.pop(context);
                 },
                 child: const Text(
@@ -220,71 +203,8 @@ class _MainScreenState extends State<MainScreen> {
         });
   }
 
-  void deleteNote(Map<String, dynamic> note) async {
-    //Update
-    var noteTotUpdate = note;
-
-    var id = noteTotUpdate["id"] as int;
-
-    SharedPreferences sharedPref = await SharedPreferences.getInstance();
-    List<String> notes = sharedPref.getStringList('noteListJson') ?? [];
-
-    List<Map<String, dynamic>> savedNotesList = [];
-
-    for (var stringJson in notes) {
-      var obj = jsonDecode(stringJson) as Map<String, dynamic>;
-      savedNotesList.add(obj);
-    }
-
-    /* savedNotesList = [
-        {"id": 12, "title": "Hello", "body": "TEXT TEST"}, //index 0
-        {"id": 23, "title": "Hello", "body": "TEXT TEST"}, //index 1
-        {"id": 34, "title": "Hello", "body": "TEXT TEST"}, //index 2
-        {"id": 45, "title": "Hello", "body": "TEXT TEST"}, //index 3
-        {"id": 56, "title": "Hello", "body": "TEXT TEST"}, //index 4
-      ]; */
-
-    int index = 0;
-
-    // to Get the index of the Note
-    for (var i = 0; i < savedNotesList.length; i++) {
-      var listId = (savedNotesList[i]['id'] as int);
-      if (listId == id) {
-        index = i;
-        break; //this is to exit the for loop
-      }
-    }
-
-    print("Before ${savedNotesList.length}");
-    savedNotesList.removeAt(index);
-    print("After ${savedNotesList.length}");
-
-    /*  savedNotesList = [
-        {"id": 12, "title": "Hello", "body": "TEXT TEST"},
-        {"id": 23, "title": "Hello", "body": "TEXT TEST"},
-        {"id": 34, "title": "new title", "body": "new new body"},
-        {"id": 45, "title": "Hello", "body": "TEXT TEST"},
-        {"id": 56, "title": "Hello", "body": "TEXT TEST"},
-      ]; */
-
-    List<String> stringList = [];
-
-    for (var obj in savedNotesList) {
-      var stringObg = jsonEncode(obj);
-      stringList.add(stringObg);
-    }
-
-    sharedPref.setStringList("noteListJson", stringList);
-
-    loadData();
-  }
-
-  void createNewNote() async {
-    print("before await");
-    await Navigator.push(
-        context, MaterialPageRoute(builder: (context) => NoteEditorScreen()));
-    print("after await");
-    loadData();
-    print("Screen SetState");
+  void createNewNote() {
+    Navigator.push(
+        context, MaterialPageRoute(builder: (_) => NoteEditorScreen()));
   }
 }
